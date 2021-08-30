@@ -1,3 +1,4 @@
+# estimate.R
 f <- function(x) log(exp(x) - 1)
 finv <- function(x) log(exp(x) + 1)
 fprime <- function(x) exp(x) / (exp(x) - 1)
