@@ -1,3 +1,8 @@
+library(plyr)
+library(gam)
+library(earth)
+library(SuperLearner)
+
 #' Simulation for treatment effect heterogeneity estimators.
 #'
 #' @param n_range n range for simulation
