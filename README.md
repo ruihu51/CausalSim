@@ -19,6 +19,12 @@ devtools::install_github("ruihu51/CausalSim")
 Usage
 -----
 
+### Load the package
+
+``` r
+require(CausalSim)
+```
+
 ### Estimation
 
 ``` 
