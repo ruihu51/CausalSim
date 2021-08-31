@@ -3,7 +3,9 @@ library(gam)
 library(earth)
 library(SuperLearner)
 
-#' Estimator psi(P) for treatment effect over the entire population
+#' Estimator psi(P) and corresponding Confidence Interval for treatment effect over the entire population.
+#' Estimator theta(P) and corresponding Confidence Interval for overall measure of the treatment effect heterogeneity.
+#' Estimator for average treatment effect.
 #'
 #' @param A a binary treatment or exposure.
 #' @param W a vector of covariates observed prior to A.
@@ -12,22 +14,19 @@ library(SuperLearner)
 #' @param func_2 superlearner method to estimate mu.
 #' @param out.glm If True, estimating mu using glm function.
 #'
-#' @return Returns three types of estimator.
+#' @return Returns a class of estimator and confidence interval.
 #' @export
 #'
 #' @examples ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.glm")
 est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
   # estimated P(A = 1 | W = w)
-  # prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
   n = length(A)
   prop.reg1 <- do.call(func_1, list(Y=A, X = data.frame(W),
                              newX = data.frame(W),
                              family = binomial(),
                              obsWeights=rep(1,n),
                              id=1:n))
-  # prop.reg1 <- SL.earth(Y=A, X = data.frame(W), newX = data.frame(W), family = binomial(), obsWeights=rep(1,n), id=1:n)
   pi.hat <- prop.reg1$pred
-  # pi.hat <- prop.reg$fitted.v
 
   # estimated mu
   AW <- cbind(A, data.frame(W))
@@ -37,7 +36,6 @@ est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
     mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
     mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
   } else {
-    # mu.reg <- SL.earth(Y=Y, X = data.frame(cbind(A, W)), newX = rbind(data.frame(cbind(A=1, W)),data.frame(cbind(A=0, W))), family = binomial(), obsWeights=rep(1,n), id=1:n)
     mu.reg <- do.call(func_2, list(Y=Y, X = data.frame(cbind(A, W)),
                                    newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
                                    family = binomial(),
@@ -52,55 +50,51 @@ est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
   tau.hat <- mu1.hat - mu0.hat
   Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
-  # estimated psi
-  # plug-in
+  # 1. estimated psi
+  # a) plug-in
   plug.in <- mean(tau.hat^2)
   eif.hat <- 2 * tau.hat * (Y - mu.hat) * Z.hat + tau.hat^2 - plug.in
   se <- sd(eif.hat)
 
   ret <- data.frame(type = 'Plug-in', est = plug.in, ll=plug.in - qnorm(.975) * se / sqrt(n), ul=plug.in + qnorm(.975) * se / sqrt(n))
 
-  # one-step
+  # b) one-step
   one.step.est <- mean( 2 * tau.hat * (Y - mu.hat) * Z.hat + tau.hat^2)
   ret <- rbind(ret,
                data.frame(type = 'One-step', est = one.step.est, ll=one.step.est - qnorm(.975) * se / sqrt(n), ul=one.step.est + qnorm(.975) * se / sqrt(n)))
 
-  # TMLE-new updated
+  # c) TMLE-new updated
   new.tmle <- ifelse(one.step.est>0, one.step.est, plug.in)
   ret <- rbind(ret,
                data.frame(type = 'TMLE-new', est = new.tmle, ll=new.tmle - qnorm(.975) * se / sqrt(n), ul=new.tmle + qnorm(.975) * se / sqrt(n)))
 
-  # TMLE-new
-  # new.tmle <- new.tmle(Y=Y, A=A, mu.hat=mu.hat, mu0.hat=mu0.hat, mu1.hat=mu1.hat, pi.hat=pi.hat)
-  # ret <- rbind(ret, new.tmle)
-
-  # estimated theta
+  # 2. estimated theta
   gamma.hat <- mean(tau.hat)
 
-  # plug-in
+  # a) plug-in
   plug.in.theta <- mean((tau.hat-gamma.hat)^2)
   se.theta <- sd( 2 * (tau.hat-gamma.hat) * (Y - mu.hat) * Z.hat + (tau.hat-gamma.hat)^2 - plug.in.theta)
   ret <- rbind(ret,
                data.frame(type = 'Plug-in (Theta)', est = plug.in.theta, ll=plug.in.theta - qnorm(.975) * se.theta / sqrt(n), ul=plug.in.theta + qnorm(.975) * se.theta / sqrt(n)))
 
-  # one-step
+  # b) one-step
   one.step.est.theta <- mean( 2 * (tau.hat-gamma.hat) * (Y - mu.hat) * Z.hat + (tau.hat-gamma.hat)^2)
   ret <- rbind(ret,
                data.frame(type = 'One-step (Theta)', est = one.step.est.theta, ll=one.step.est.theta - qnorm(.975) * se.theta / sqrt(n), ul=one.step.est.theta + qnorm(.975) * se.theta / sqrt(n)))
 
-  # TMLE-new
+  # c) TMLE-new
   new.tmle.theta <- ifelse(one.step.est.theta>0, one.step.est.theta, plug.in.theta)
   ret <- rbind(ret,
                data.frame(type = 'TMLE-new (Theta)', est = new.tmle.theta, ll=new.tmle.theta - qnorm(.975) * se.theta / sqrt(n), ul=new.tmle.theta + qnorm(.975) * se.theta / sqrt(n)))
 
-  # estimated ATE
-  # plug-in
+  # 3. estimated ATE
+  # a) plug-in
   plug.in.ate <- mean(tau.hat)
   ate.eif <- (Y - mu.hat) * Z.hat + tau.hat - plug.in.ate
   ret <- rbind(ret, data.frame(type = 'Plug-in (ATE)', est = plug.in.ate, ll = plug.in.ate -1.96 * sd(ate.eif) / sqrt(n),
                                ul = plug.in.ate + 1.96 * sd(ate.eif) / sqrt(n)))
 
-  # one-step
+  # b) one-step
   os.ate <- mean((Y - mu.hat) * Z.hat + tau.hat)
   ate.eif <- (Y - mu.hat) * Z.hat + tau.hat - os.ate
   ret <- rbind(ret, data.frame(type = 'One-step (ATE)', est = os.ate, ll = os.ate -1.96 * sd(ate.eif) / sqrt(n),
