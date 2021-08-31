@@ -152,6 +152,19 @@ if(null.sims) {
   Y <- rbinom(n, size = 1, prob = mu0(A, W))
 }
 
+#' Estimator psi(P) for treatment effect over the entire population
+#'
+#' @param A a binary treatment or exposure.
+#' @param W a vector of covariates observed prior to A.
+#' @param Y the observed outcome.
+#' @param func_1 superlearner method to estimate P(A = 1 | W = w).
+#' @param func_2 superlearner method to estimate mu.
+#' @param out.glm If True, estimating mu using glm function.
+#'
+#' @return Returns three types of estimator.
+#' @export
+#'
+#' @examples ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.glm")
 est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
   # estimated P(A = 1 | W = w)
   # prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
