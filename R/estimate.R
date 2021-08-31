@@ -103,41 +103,7 @@ est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
   return(ret)
 }
 
-est.psi.sim <-  function(n_range, j_range, func_1, func_2, null.sims=FALSE){
-  ests <- ldply(n_range, function(n) {
-    ldply(j_range, function(j) {
-      # print(j)
-      if(j %% 100 == 0) cat(n, j, '\n')
-      seed <- sample(1e3:1e8, 1)
-      set.seed(seed)
 
-      W <- matrix(runif(n*3, 0, 1), ncol=3)
-      A <- rbinom(n, size = 1, prob = pi0(W))
-      if(null.sims) {
-        Y <- rbinom(n, size = 1, prob = mu0.null(A, W))
-        psi0 <- mean((mu0.null(1,W) - mu0.null(0,W))^2)
-        theta0 <- var((mu0.null(1,W) - mu0.null(0,W)))
-      } else {
-        Y <- rbinom(n, size = 1, prob = mu0(A, W))
-        psi0 <- mean((mu0(1,W) - mu0(0,W))^2)
-        theta0 <- var((mu0(1,W) - mu0(0,W)))
-      }
-
-      ret <- est.psi(A, W, Y, func_1, func_2)
-
-      ret$n <- n
-      ret$j <- j
-      ret$seed <- seed
-
-      ret$psi0 <- psi0
-      ret$theta0 <- theta0
-
-      return(ret)
-    })
-  })
-
-  return(ests)
-}
 
 library(ggplot2)
 
