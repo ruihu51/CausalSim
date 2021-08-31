@@ -43,3 +43,20 @@ if(null.sims) {
 ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.earth")
 ret
 ```
+
+### Simulation
+```
+ests <-  est.psi.sim(200*c(1:2), 1:500, func_1 = "SL.gam", func_2 = "SL.gam", null.sims=FALSE)
+ests
+```
+
+### Summary and Plot
+```
+est.psi.plot(ests, plot.type='density')
+est.theta.plot(ests, plot.type='density')
+summaries.psi <- est.psi.summary(ests)
+summaries.theta <- est.theta.summary(ests)
+```
+
+
+
