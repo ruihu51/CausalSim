@@ -39,6 +39,7 @@ if(null.sims) {
   theta0 <- var((mu0(1,W) - mu0(0,W)))
 }
 
+# Estimate
 ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.earth")
 ret
 ```
