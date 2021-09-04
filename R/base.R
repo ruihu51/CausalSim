@@ -87,17 +87,17 @@ get.tmle <- function(Y, A, mu0.hat, mu1.hat, pi.hat, verbose=FALSE, max.iter=30)
 
 }
 
-boot.tmle <- function(Y, A, mu0.hat, mu1.hat, pi.hat, n.boot = 500) {
-  n <- length(Y)
-
-  boot.ests <- sapply(1:500, function(n.boot) {
-    boot.inds <- sample(1:n, n, replace=TRUE)
-
-    get.tmle(Y = Y[boot.inds], A = A[boot.inds], mu0.hat = mu0.hat[boot.inds], mu1.hat = mu1.hat[boot.inds], pi.hat = pi.hat[boot.inds])['tmle']
-  })
-  quantile(boot.ests, c(.025, .975))
-
-}
+# boot.tmle <- function(Y, A, mu0.hat, mu1.hat, pi.hat, n.boot = 500) {
+#   n <- length(Y)
+#
+#   boot.ests <- sapply(1:500, function(n.boot) {
+#     boot.inds <- sample(1:n, n, replace=TRUE)
+#
+#     get.tmle(Y = Y[boot.inds], A = A[boot.inds], mu0.hat = mu0.hat[boot.inds], mu1.hat = mu1.hat[boot.inds], pi.hat = pi.hat[boot.inds])['tmle']
+#   })
+#   quantile(boot.ests, c(.025, .975))
+#
+# }
 
 new.tmle <- function(Y, A, mu.hat, mu0.hat, mu1.hat, pi.hat) {
   n <- length(Y)

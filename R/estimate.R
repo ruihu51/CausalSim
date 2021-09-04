@@ -102,3 +102,33 @@ est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
 
   return(ret)
 }
+
+
+#' Construct nonparametric bootstrap confidence intervals
+#'
+#' @param A a binary treatment or exposure.
+#' @param W a vector of covariates observed prior to A.
+#' @param Y the observed outcome.
+#' @param est.type 'TMLE-new' or 'TMLE-new(theta)'
+#' @param func_1 superlearner method to estimate P(A = 1 | W = w).
+#' @param func_2 superlearner method to estimate mu.
+#' @param n.boot number of bootstrap samples
+#'
+#' @return Returns 95% bootstrap CI
+#' @export
+#'
+#' @examples boot.tmle(A,W,Y, est.type = 'TMLE-new')
+boot.tmle <- function(A, W, Y, est.type = 'TMLE-new', func_1 = "SL.glm", func_2 = "SL.glm", n.boot = 500) {
+  n <- length(Y)
+
+  boot.ests <- sapply(1:500, function(n.boot) {
+    boot.inds <- sample(1:n, n, replace=TRUE)
+
+    ret <- est.psi(A[boot.inds], W[boot.inds], Y[boot.inds],
+                   func_1 = "SL.glm", func_2 = "SL.glm")
+
+    ret[ret$type == est.type, 'est']
+  })
+  quantile(boot.ests, c(.025, .975))
+
+}
