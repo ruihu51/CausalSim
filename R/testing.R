@@ -45,8 +45,17 @@ hteNullTest <- function(Y, A, W) {
   gamma.hat <- mean(tau.hat)
 
   # primitive function
-  Gamma.hat <- function(w) mean((as.numeric(W <= w)) * tau.hat)
-  Omega.hat <- mean()
+  w.vals <- sort(unique(W)) #?can't sort
+  d <- dim(W)[2]
+  # w.ecdf <- ecdf(W) #?ecdf multivariate
+  # u.vals <- w.ecdf(w.vals)
+
+  library(mltools)
+  library(data.table)
+  u.vals <- empirical_cdf(data.table(W), ubounds = data.table(w.vals)[1,])$CDF
+
+  Gamma.w.vals <- sapply(w.vals, function(w0) mean(as.numeric(rowSums(W <= w) == d) * tau.hat))
+  Omega.w.vals <- Gamma.w.vals - gamma.hat * u.vals
 
   # nonparametric EIF
   eif.Gamma <- ((Y - mu.hat) * Z.hat + tau.hat) - Gamma.hat
