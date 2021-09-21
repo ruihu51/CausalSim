@@ -1,134 +1,120 @@
-library(plyr)
-library(gam)
-library(earth)
-library(SuperLearner)
-
 #' Estimator psi(P) and corresponding Confidence Interval for treatment effect over the entire population.
 #' Estimator theta(P) and corresponding Confidence Interval for overall measure of the treatment effect heterogeneity.
-#' Estimator for average treatment effect.
 #'
 #' @param A a binary treatment or exposure.
 #' @param W a vector of covariates observed prior to A.
 #' @param Y the observed outcome.
-#' @param func_1 superlearner method to estimate P(A = 1 | W = w).
-#' @param func_2 superlearner method to estimate mu.
-#' @param out.glm If True, estimating mu using glm function.
 #'
 #' @return Returns a class of estimator and confidence interval.
 #' @export
 #'
-#' @examples ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.glm")
-est.psi <- function(A, W, Y, func_1, func_2, out.glm=FALSE){
-  # estimated P(A = 1 | W = w)
+#' @examples
+#' ret1 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               conf.int = FALSE, conf.int.type = 'Wald', conf.level = 0.95))
+#' ret2 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               conf.int = TRUE, conf.int.type = 'Wald', conf.level = 0.95))
+#' ret3 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+#'                                               conf.int = TRUE, conf.int.type = 'boot', conf.level = 0.95,
+#'                                               n.boot = 500))
+hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.type = 'Wald', conf.level = 0.95, n.boot = 500)){
   n = length(A)
-  prop.reg1 <- do.call(func_1, list(Y=A, X = data.frame(W),
-                             newX = data.frame(W),
-                             family = binomial(),
-                             obsWeights=rep(1,n),
-                             id=1:n))
-  pi.hat <- prop.reg1$pred
 
-  # estimated mu
-  AW <- cbind(A, data.frame(W))
-  if(out.glm) {
-    mu.reg  <- glm(Y ~ ., data=AW, family='binomial')
-    mu.hat <- mu.reg$fitted.values
-    mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
-    mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
-  } else {
-    mu.reg <- do.call(func_2, list(Y=Y, X = data.frame(cbind(A, W)),
-                                   newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
-                                   family = binomial(),
-                                   obsWeights=rep(1,n),
-                                   id=1:n))
-    mu1.hat <- mu.reg$pred[1:n]
-    mu0.hat <- mu.reg$pred[-(1:n)]
-    mu.hat <- A * mu1.hat + (1-A) * mu0.hat
+  # estimated P(A = 1 | W = w)
+  if(is.null(control$pi.hat)){
+    prop.reg <- SuperLearner(Y=A, X = data.frame(W),
+                              newX = data.frame(W),
+                              SL.library = control$pi.SL.library,
+                              family = binomial(),
+                              obsWeights=rep(1,n),
+                              id=1:n)
+    control$pi.hat <- prop.reg$SL.predict
   }
 
+  # estimated mu
+  if(is.null(control$mu.hats)){
+    AW <- cbind(A, data.frame(W))
+    mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
+                             newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
+                             SL.library = control$mu.SL.library,
+                             family = binomial(),
+                             obsWeights=rep(1,n),
+                             id=1:n)
+    control$mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
+  }
+
+  control$mu.hat <- A * control$mu.hats$mu1 + (1-A) * control$mu.hats$mu0
   # estimated tau
-  tau.hat <- mu1.hat - mu0.hat
-  Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
+  tau.hat <- control$mu.hats$mu1 - control$mu.hats$mu0
+  Z.hat <- (2*A - 1) / (A * control$pi.hat + (1-A) * (1-control$pi.hat))
 
   # 1. estimated psi
   # a) plug-in
-  plug.in <- mean(tau.hat^2)
-  eif.hat <- 2 * tau.hat * (Y - mu.hat) * Z.hat + tau.hat^2 - plug.in
-  se <- sd(eif.hat)
-
-  ret <- data.frame(type = 'Plug-in', est = plug.in, ll=plug.in - qnorm(.975) * se / sqrt(n), ul=plug.in + qnorm(.975) * se / sqrt(n))
+  psi.plug.in <- mean(tau.hat^2)
+  psi.eif.hat <- 2 * tau.hat * (Y - control$mu.hat) * Z.hat + tau.hat^2 - psi.plug.in
+  psi.se <- sd(psi.eif.hat)
 
   # b) one-step
-  one.step.est <- mean( 2 * tau.hat * (Y - mu.hat) * Z.hat + tau.hat^2)
-  ret <- rbind(ret,
-               data.frame(type = 'One-step', est = one.step.est, ll=one.step.est - qnorm(.975) * se / sqrt(n), ul=one.step.est + qnorm(.975) * se / sqrt(n)))
+  psi.one.step.est <- mean(2 * tau.hat * (Y - control$mu.hat) * Z.hat + tau.hat^2)
 
-  # c) TMLE-new updated
-  new.tmle <- ifelse(one.step.est>0, one.step.est, plug.in)
-  ret <- rbind(ret,
-               data.frame(type = 'TMLE-new', est = new.tmle, ll=new.tmle - qnorm(.975) * se / sqrt(n), ul=new.tmle + qnorm(.975) * se / sqrt(n)))
+  # c) truncated
+  psi.est <- ifelse(psi.one.step.est>0, psi.one.step.est, psi.plug.in)
 
   # 2. estimated theta
   gamma.hat <- mean(tau.hat)
 
   # a) plug-in
-  plug.in.theta <- mean((tau.hat-gamma.hat)^2)
-  se.theta <- sd( 2 * (tau.hat-gamma.hat) * (Y - mu.hat) * Z.hat + (tau.hat-gamma.hat)^2 - plug.in.theta)
-  ret <- rbind(ret,
-               data.frame(type = 'Plug-in (Theta)', est = plug.in.theta, ll=plug.in.theta - qnorm(.975) * se.theta / sqrt(n), ul=plug.in.theta + qnorm(.975) * se.theta / sqrt(n)))
+  theta.plug.in <- mean((tau.hat-gamma.hat)^2)
+  theta.eif.hat <- 2 * (tau.hat-gamma.hat) * (Y - control$mu.hat) * Z.hat + (tau.hat-gamma.hat)^2 - theta.plug.in
+  theta.se <- sd(theta.eif.hat)
 
   # b) one-step
-  one.step.est.theta <- mean( 2 * (tau.hat-gamma.hat) * (Y - mu.hat) * Z.hat + (tau.hat-gamma.hat)^2)
-  ret <- rbind(ret,
-               data.frame(type = 'One-step (Theta)', est = one.step.est.theta, ll=one.step.est.theta - qnorm(.975) * se.theta / sqrt(n), ul=one.step.est.theta + qnorm(.975) * se.theta / sqrt(n)))
+  theta.one.step.est <- mean(2 * (tau.hat-gamma.hat) * (Y - control$mu.hat) * Z.hat + (tau.hat-gamma.hat)^2)
 
-  # c) TMLE-new
-  new.tmle.theta <- ifelse(one.step.est.theta>0, one.step.est.theta, plug.in.theta)
-  ret <- rbind(ret,
-               data.frame(type = 'TMLE-new (Theta)', est = new.tmle.theta, ll=new.tmle.theta - qnorm(.975) * se.theta / sqrt(n), ul=new.tmle.theta + qnorm(.975) * se.theta / sqrt(n)))
+  # c) truncated
+  theta.est <- ifelse(theta.one.step.est>0, theta.one.step.est, theta.plug.in)
 
-  # 3. estimated ATE
-  # a) plug-in
-  plug.in.ate <- mean(tau.hat)
-  ate.eif <- (Y - mu.hat) * Z.hat + tau.hat - plug.in.ate
-  ret <- rbind(ret, data.frame(type = 'Plug-in (ATE)', est = plug.in.ate, ll = plug.in.ate -1.96 * sd(ate.eif) / sqrt(n),
-                               ul = plug.in.ate + 1.96 * sd(ate.eif) / sqrt(n)))
+  # confidence interval
+  if(control$conf.int){
+    if(tolower(control$conf.int.type) == "wald"){
 
-  # b) one-step
-  os.ate <- mean((Y - mu.hat) * Z.hat + tau.hat)
-  ate.eif <- (Y - mu.hat) * Z.hat + tau.hat - os.ate
-  ret <- rbind(ret, data.frame(type = 'One-step (ATE)', est = os.ate, ll = os.ate -1.96 * sd(ate.eif) / sqrt(n),
-                               ul = os.ate + 1.96 * sd(ate.eif) / sqrt(n)))
+      # Wald-type CI
+      ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se,
+                        ll=psi.est - qnorm(1-(1-control$conf.level)/2) * psi.se / sqrt(n),
+                        ul=psi.est + qnorm(1-(1-control$conf.level)/2) * psi.se / sqrt(n))
+      ret <- rbind(ret,
+                   data.frame(type = 'theta.est', est = theta.est, se = theta.se,
+                              ll=theta.est - qnorm(1-(1-control$conf.level)/2) * theta.se / sqrt(n),
+                              ul=theta.est + qnorm(1-(1-control$conf.level)/2) * theta.se / sqrt(n)))
+    } else {
 
+      # Bootstrap CI
+      boot.ests <- sapply(1:control$n.boot, function(x) {
+        boot.inds <- sample(1:n, n, replace=TRUE)
+
+        boot.pi.hat <- control$pi.hat[boot.inds]
+        boot.mu.hats <- control$mu.hats[boot.inds,]
+        boot.ret <- hte.estimator(A[boot.inds], W[boot.inds], Y[boot.inds],
+                             control = list(pi.hat = boot.pi.hat,
+                                            mu.hats = boot.mu.hats,
+                                            conf.int = FALSE))
+        boot.ret$est
+      })
+      boot.ci <- apply(boot.ests, 1, quantile, c((1-control$conf.level)/2, 1-(1-control$conf.level)/2))
+      ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se,
+                        ll = boot.ci[,1][[1]],
+                        ul = boot.ci[,1][[2]])
+      ret <- rbind(ret,
+                   data.frame(type = 'theta.est', est = theta.est, se = theta.se,
+                              ll = boot.ci[,2][[1]],
+                              ul = boot.ci[,2][[2]]))
+    }
+  } else {
+    ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se)
+    ret <- rbind(ret,
+                 data.frame(type = 'theta.est', est = theta.est, se = theta.se))
+  }
   return(ret)
-}
-
-
-#' Construct nonparametric bootstrap confidence intervals
-#'
-#' @param A a binary treatment or exposure.
-#' @param W a vector of covariates observed prior to A.
-#' @param Y the observed outcome.
-#' @param est.type 'TMLE-new' or 'TMLE-new(theta)'
-#' @param func_1 superlearner method to estimate P(A = 1 | W = w).
-#' @param func_2 superlearner method to estimate mu.
-#' @param n.boot number of bootstrap samples
-#'
-#' @return Returns 95% bootstrap CI
-#' @export
-#'
-#' @examples boot.tmle(A,W,Y, est.type = 'TMLE-new')
-boot.tmle <- function(A, W, Y, est.type = 'TMLE-new', func_1 = "SL.glm", func_2 = "SL.glm", n.boot = 500) {
-  n <- length(Y)
-
-  boot.ests <- sapply(1:500, function(n.boot) {
-    boot.inds <- sample(1:n, n, replace=TRUE)
-
-    ret <- est.psi(A[boot.inds], W[boot.inds], Y[boot.inds],
-                   func_1 = "SL.glm", func_2 = "SL.glm")
-
-    ret[ret$type == est.type, 'est']
-  })
-  quantile(boot.ests, c(.025, .975))
-
 }
