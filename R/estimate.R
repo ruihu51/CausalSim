@@ -84,8 +84,8 @@ hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.typ
   if(control$conf.int){
     if(tolower(control$conf.int.type) == "wald"){
       # Wald-type CI
-      ret$ll = ret1$est - qnorm(1-(1-control$conf.level)/2) * ret1$se / sqrt(n)
-      ret$ul = ret1$est + qnorm(1-(1-control$conf.level)/2) * ret1$se / sqrt(n)
+      ret$ll = ret$est - qnorm(1-(1-control$conf.level)/2) * ret$se / sqrt(n)
+      ret$ul = ret$est + qnorm(1-(1-control$conf.level)/2) * ret$se / sqrt(n)
     } else {
       # Bootstrap CI
       boot.ests <- sapply(1:control$n.boot, function(x) {
