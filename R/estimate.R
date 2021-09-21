@@ -76,20 +76,17 @@ hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.typ
   # c) truncated
   theta.est <- ifelse(theta.one.step.est>0, theta.one.step.est, theta.plug.in)
 
+  ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se)
+  ret <- rbind(ret,
+               data.frame(type = 'theta.est', est = theta.est, se = theta.se))
+
   # confidence interval
   if(control$conf.int){
     if(tolower(control$conf.int.type) == "wald"){
-
       # Wald-type CI
-      ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se,
-                        ll=psi.est - qnorm(1-(1-control$conf.level)/2) * psi.se / sqrt(n),
-                        ul=psi.est + qnorm(1-(1-control$conf.level)/2) * psi.se / sqrt(n))
-      ret <- rbind(ret,
-                   data.frame(type = 'theta.est', est = theta.est, se = theta.se,
-                              ll=theta.est - qnorm(1-(1-control$conf.level)/2) * theta.se / sqrt(n),
-                              ul=theta.est + qnorm(1-(1-control$conf.level)/2) * theta.se / sqrt(n)))
+      ret$ll = ret1$est - qnorm(1-(1-control$conf.level)/2) * ret1$se / sqrt(n)
+      ret$ul = ret1$est + qnorm(1-(1-control$conf.level)/2) * ret1$se / sqrt(n)
     } else {
-
       # Bootstrap CI
       boot.ests <- sapply(1:control$n.boot, function(x) {
         boot.inds <- sample(1:n, n, replace=TRUE)
@@ -103,18 +100,9 @@ hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.typ
         boot.ret$est
       })
       boot.ci <- apply(boot.ests, 1, quantile, c((1-control$conf.level)/2, 1-(1-control$conf.level)/2))
-      ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se,
-                        ll = boot.ci[,1][[1]],
-                        ul = boot.ci[,1][[2]])
-      ret <- rbind(ret,
-                   data.frame(type = 'theta.est', est = theta.est, se = theta.se,
-                              ll = boot.ci[,2][[1]],
-                              ul = boot.ci[,2][[2]]))
+      ret$ll = c(boot.ci[,1][[1]], boot.ci[,2][[1]])
+      ret$ul = c(boot.ci[,1][[2]], boot.ci[,2][[2]])
     }
-  } else {
-    ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se)
-    ret <- rbind(ret,
-                 data.frame(type = 'theta.est', est = theta.est, se = theta.se))
   }
   return(ret)
 }
