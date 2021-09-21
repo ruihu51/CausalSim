@@ -46,8 +46,18 @@ if(null.sims) {
 }
 
 # Estimate
-ret <- est.psi(A, W, Y, func_1 = "SL.glm", func_2 = "SL.earth")
-ret
+ret1 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                      mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                      conf.int = FALSE, conf.int.type = 'Wald', conf.level = 0.95))
+
+ret2 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                              mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                              conf.int = TRUE, conf.int.type = 'Wald', conf.level = 0.95))
+
+ret3 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                      mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                                      conf.int = TRUE, conf.int.type = 'boot', conf.level = 0.95,
+                                      n.boot = 500))
 ```
 
 ### Simulation
