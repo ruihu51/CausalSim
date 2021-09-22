@@ -1,3 +1,4 @@
+library(mvtnorm)
 #' Nonparametric test
 #'
 #' @param Y
@@ -44,42 +45,50 @@ hteNullTest <- function(Y, A, W) {
   # estimated theta
   gamma.hat <- mean(tau.hat)
 
+  w.ecdf <- function(w) {
+    vec.leq <- function(x,y) prod(x <= y)
+    return(mean(apply(W, 1, vec.leq, y = w)))
+  }
+  u.vals <- sort(apply(W, 1, w.ecdf))
+
   # primitive function
-  w.vals <- sort(unique(W)) #?can't sort
-  d <- dim(W)[2]
-  # w.ecdf <- ecdf(W) #?ecdf multivariate
-  # u.vals <- w.ecdf(w.vals)
-
-  library(mltools)
-  library(data.table)
-  u.vals <- empirical_cdf(data.table(W), ubounds = data.table(w.vals)[1,])$CDF
-
-  Gamma.w.vals <- sapply(w.vals, function(w0) mean(as.numeric(rowSums(W <= w) == d) * tau.hat))
+  # n.new * 1 vector
+  Gamma.w.vals <- apply(w.vals, 1, function(w0) mean(prod(W <= w0) * tau.hat))
   Omega.w.vals <- Gamma.w.vals - gamma.hat * u.vals
 
   # nonparametric EIF
-  eif.Gamma <- ((Y - mu.hat) * Z.hat + tau.hat) - Gamma.hat
-  eif.Omega <- ((Y - mu.hat) * Z.hat + tau.hat - gamma.hat) - Omega.hat
+  # n * n.new matrix
+  eif.Gamma <- apply(w.vals, 1, function(w0) {
+    (prod(W <= w0)) * (Z.hat * (Y - mu.hats) + tau.hat)
+    - Gamma.w.vals[which(w.vals == w0)]
+  })
+  eif.Omega <- apply(w.vals, 1, function(w0) {
+    (as.numeric(rowSums(W <= w0) == d) - w.ecdf(w0)) * (Z.hat * (Y - mu.hats) + tau.hat - gamma.hat)
+    - Omega.w.vals[which(w.vals == w0)]
+  })
 
   # one-step estimators
-  Gamma.os.est <- mean(((Y - mu.hat) * Z.hat + tau.hat))
-  Omega.os.est <- mean(((Y - mu.hat) * Z.hat + tau.hat - gamma.hat))
+  # n.new * 1 vector
+  Gamma.os.est <- colMeans(eif.Gamma) + Gamma.w.vals
+  Omega.os.est <- colMeans(eif.Omega) + Omega.w.vals
 
+  # testing procedure
   # test statistics
   Gamma.stat <- n^1/2*max(abs(Gamma.os.est))
   Omega.stat <- n^1/2*max(abs(Omega.os.est))
 
   # covariance matrices
-  Gamma.cov.var <- sapply(1:length(a.vals), function(s) sapply(1:length(a.vals), function(t) {
-    mean(IF.vals[,s] * IF.vals[,t])
+  n.new <- length(w.vals)
+  Gamma.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
+    mean(eif.Gamma[,s] * eif.Gamma[,t])
   }))
   Omega.cov.var <- sapply(1:length(a.vals), function(s) sapply(1:length(a.vals), function(t) {
-    mean(IF.vals[,s] * IF.vals[,t])
+    mean(eif.Omega[,s] * eif.Omega[,t])
   }))
 
   # quantiles
-  Gamma.quantile <- qmvnorm()
-  Omega.quantile <- qmvnorm()
+  Gamma.quantile <- qmvnorm(0.95, sigma = Gamma.cov.var, tail = "both")
+  Omega.quantile <- qmvnorm(0.95, sigma = Omega.cov.var, tail = "both")
 
   res <- c(Gamma.stat, Omega.stat, Gamma.quantile, Omega.quantile)
 
