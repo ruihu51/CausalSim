@@ -87,8 +87,8 @@ hteNullTest <- function(Y, A, W) {
   }))
 
   # quantiles
-  Gamma.quantile <- qmvnorm(0.95, sigma = Gamma.cov.var, tail = "both")
-  Omega.quantile <- qmvnorm(0.95, sigma = Omega.cov.var, tail = "both")
+  Gamma.quantile <- qmvnorm(0.95, sigma = Gamma.cov.var, tail = "both")$quantile
+  Omega.quantile <- qmvnorm(0.95, sigma = Omega.cov.var, tail = "both")$quantile
 
   res <- c(Gamma.stat, Omega.stat, Gamma.quantile, Omega.quantile)
 
