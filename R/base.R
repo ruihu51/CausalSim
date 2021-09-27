@@ -130,3 +130,18 @@ mu0.null <- function(a, w) expit(sin(3 * w[,1]) + w[,2]^2 + w[,1] + sqrt(w[,1]) 
 
 
 ate0 <- mean(mu0.null(1, W) - mu0.null(0,W))
+
+
+hte.measure.NullTest.control <- function(control){
+  control.default = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                         mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                         conf.int = FALSE, conf.int.type = 'Wald',
+                         conf.level = 0.95, n.boot = 500)
+  control.names <- names(control)
+  if(!is.null(control.names)) {
+    for (name in control.names) {
+      control.default[[name]] <- control[[name]]
+    }
+  }
+  return(control.default)
+}

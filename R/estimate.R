@@ -4,6 +4,7 @@
 #' @param A a binary treatment or exposure.
 #' @param W a vector of covariates observed prior to A.
 #' @param Y the observed outcome.
+#' @param control Optional list of control parameters. If \code{control=list()}, default.control.list will be used. See \code{hte.measure.NullTest.control} for details.
 #'
 #' @return Returns a class of estimator and confidence interval.
 #' @export
@@ -19,7 +20,14 @@
 #'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
 #'                                               conf.int = TRUE, conf.int.type = 'boot', conf.level = 0.95,
 #'                                               n.boot = 500))
-hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.type = 'Wald', conf.level = 0.95, n.boot = 500)){
+
+
+
+
+
+htem.estimator <- function(A, W, Y, control = list()){
+
+  control <- hte.measure.NullTest.control(control)
   n = length(A)
 
   # estimated P(A = 1 | W = w)
@@ -36,10 +44,15 @@ hte.estimator <- function(A, W, Y, control = list(conf.int = FALSE, conf.int.typ
   # estimated mu
   if(is.null(control$mu.hats)){
     AW <- cbind(A, data.frame(W))
+    if(length(setdiff(Y, c(0,1))) == 0) {
+      family = 'binomial'
+    } else {
+      family = 'gaussian'
+    }
     mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
                              newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
                              SL.library = control$mu.SL.library,
-                             family = binomial(),
+                             family = family,
                              obsWeights=rep(1,n),
                              id=1:n)
     control$mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
