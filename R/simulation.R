@@ -14,8 +14,10 @@ library(SuperLearner)
 #' @return Returns a list of simulation result.
 #' @export
 #'
-#' @examples ests <-  est.psi.sim(200*c(1:2), 1:500, func_1 = "SL.gam", func_2 = "SL.gam", null.sims=FALSE)
-est.psi.sim <-  function(n_range, j_range, func_1, func_2, null.sims=FALSE){
+#' @examples
+#' ests.sim.1 <- ests.sim(200*c(1:10), 1:500, control = list(conf.int = TRUE), null.sims=FALSE, out.glm=TRUE)
+#' ests.sim.2 <- ests.sim(200*c(1:10), 1:500, control = list(conf.int = TRUE, conf.int.type = 'boot'), null.sims=FALSE, out.glm=TRUE)
+ests.sim <-  function(n_range, j_range, control, null.sims=FALSE, out.glm=TRUE){
   ests <- ldply(n_range, function(n) {
     ldply(j_range, function(j) {
       # print(j)
@@ -35,14 +37,33 @@ est.psi.sim <-  function(n_range, j_range, func_1, func_2, null.sims=FALSE){
         theta0 <- var((mu0(1,W) - mu0(0,W)))
       }
 
-      ret <- est.psi(A, W, Y, func_1, func_2)
+      prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+      pi.hat <- prop.reg$fitted.values
+      AW <- cbind(A, data.frame(W))
+      mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+      mu.hat <- mu.reg$fitted.values
+      mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                 data.frame(W)), type = 'response')
+      mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                 data.frame(W)), type = 'response')
+      mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+      if (out.glm){
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+      #print(control)
+      ret <- htem.estimator(A, W, Y, control = control)
 
-      ret$n <- n
-      ret$j <- j
-      ret$seed <- seed
+      ret$pi0 <- rep(mean(pi0(W)), 2)
+      ret$pi.hat <- rep(mean(pi.hat), 2)
+      ret$mu0 <- rep(mean(mu0(A, W)), 2)
+      ret$mu.hat <- rep(mean(A*mu.hats$mu1 + (1-A)*mu.hats$mu0), 2)
+      ret$n <- rep(n, 2)
+      ret$j <- rep(j, 2)
+      ret$seed <- rep(seed, 2)
 
-      ret$psi0 <- psi0
-      ret$theta0 <- theta0
+      ret$psi0 <- rep(psi0, 2)
+      ret$theta0 <- rep(theta0, 2)
 
       return(ret)
     })

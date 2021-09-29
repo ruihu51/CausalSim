@@ -10,20 +10,9 @@
 #' @export
 #'
 #' @examples
-#' ret1 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               conf.int = FALSE, conf.int.type = 'Wald', conf.level = 0.95))
-#' ret2 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               conf.int = TRUE, conf.int.type = 'Wald', conf.level = 0.95))
-#' ret3 <- hte.estimator(A, W, Y, control = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-#'                                               conf.int = TRUE, conf.int.type = 'boot', conf.level = 0.95,
-#'                                               n.boot = 500))
-
-
-
-
+#' ret1 <- htem.estimator(A, W, Y, control = list()) # default control setting
+#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE)) # estimate with wald-type CI
+#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE, conf.int.type = 'boot')) # estimate with Bootstrap CI
 
 htem.estimator <- function(A, W, Y, control = list()){
 
