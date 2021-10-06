@@ -124,7 +124,8 @@ new.tmle <- function(Y, A, mu.hat, mu0.hat, mu1.hat, pi.hat) {
 W <- matrix(runif(3e5, 0, 1), ncol=3)
 pi0 <- function(w) expit(sqrt(abs(w[,1])) + w[,3])
 # mu0 <- function(a, w) expit(sin(3 * w[,1]) + w[,2]^2 + a * w[,1] + a* sqrt(w[,1]) * w[,2])
-mu0 <- function(a, w) expit(3 * w[,1] + w[,2] + a * w[,1])
+# mu0 <- function(a, w) expit(3 * w[,1] + w[,2] + a * w[,1])
+mu0 <- function(a, w) expit(3 * w[,1] - 2*w[,2] + 2*a - 4*w[,3])
 
 # mu0.null <- function(a, w) expit(sin(3 * w[,1]) + w[,2]^2 + w[,1] + sqrt(w[,1]) * w[,2])
 mu0.null <- function(a, w) expit(3 * w[,1] + w[,2] + w[,1])

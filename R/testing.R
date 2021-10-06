@@ -82,6 +82,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
 
   # nonparametric EIF
   # n * n.new matrix
+  vec.eq <- function(x,y) prod(x == y)
   eif.Gamma <- apply(w.vals, 1, function(w0) {
     (apply(W, 1, function(x) prod(x <= w0))) * (Z.hat * (Y - control$mu.hat) + tau.hat) -
       Gamma.w.vals[which(as.logical(apply(W, 1, vec.eq, y = w0)))]
@@ -102,17 +103,20 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
   Omega.stat <- n^1/2*max(abs(Omega.os.est))
 
   # covariance matrices
-  n.new <- length(w.vals)
+  n.new <- dim(w.vals)[1]
   Gamma.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
     mean(eif.Gamma[,s] * eif.Gamma[,t])
   }))
-  Omega.cov.var <- sapply(1:length(a.vals), function(s) sapply(1:length(a.vals), function(t) {
+  Omega.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
     mean(eif.Omega[,s] * eif.Omega[,t])
   }))
 
   # quantiles
-  Gamma.quantile <- qmvnorm(0.95, sigma = Gamma.cov.var, tail = "both")$quantile
-  Omega.quantile <- qmvnorm(0.95, sigma = Omega.cov.var, tail = "both")$quantile
+  Gamma.epsilon <- rmvnorm(n=500, mean=rep(0, n.new), sigma = Gamma.cov.var)
+  Gamma.quantile <- quantile(apply(Gamma.epsilon, 1, function(x) {max(abs(x))}), 0.95)
+
+  Omega.epsilon <- rmvnorm(n=500, mean=rep(0, n.new), sigma = Omega.cov.var)
+  Omega.quantile <- quantile(apply(Omega.epsilon, 1, function(x) {max(abs(x))}), 0.95)
 
   res <- c(Gamma.stat, Omega.stat, Gamma.quantile, Omega.quantile)
 
