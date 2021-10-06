@@ -10,37 +10,59 @@ library(mvtnorm)
 #'
 #' @examples
 
-hteNullTest <- function(Y, A, W) {
-  # estimated P(A = 1 | W = w)
+hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
+  control <- hte.measure.NullTest.control(control)
   n = length(A)
-  prop.reg1 <- do.call(func_1, list(Y=A, X = data.frame(W),
-                                    newX = data.frame(W),
-                                    family = binomial(),
-                                    obsWeights=rep(1,n),
-                                    id=1:n))
-  pi.hat <- prop.reg1$pred
 
-  # estimated mu
-  AW <- cbind(A, data.frame(W))
-  if(out.glm) {
-    mu.reg  <- glm(Y ~ ., data=AW, family='binomial')
+  if (out.glm){
+    prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+    pi.hat <- prop.reg$fitted.values
+    AW <- cbind(A, data.frame(W))
+    mu.reg <- glm(Y ~ ., data=AW, family='binomial')
     mu.hat <- mu.reg$fitted.values
-    mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
-    mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
-  } else {
-    mu.reg <- do.call(func_2, list(Y=Y, X = data.frame(cbind(A, W)),
-                                   newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
-                                   family = binomial(),
-                                   obsWeights=rep(1,n),
-                                   id=1:n))
-    mu1.hat <- mu.reg$pred[1:n]
-    mu0.hat <- mu.reg$pred[-(1:n)]
-    mu.hat <- A * mu1.hat + (1-A) * mu0.hat
+    mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                               data.frame(W)), type = 'response')
+    mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                               data.frame(W)), type = 'response')
+    mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+    control$pi.hat = pi.hat
+    control$mu.hats = mu.hats
   }
 
+
+  # estimated P(A = 1 | W = w)
+  if(is.null(control$pi.hat)){
+    prop.reg <- SuperLearner(Y=A, X = data.frame(W),
+                             newX = data.frame(W),
+                             SL.library = control$pi.SL.library,
+                             family = binomial(),
+                             obsWeights=rep(1,n),
+                             id=1:n)
+    control$pi.hat <- prop.reg$SL.predict
+  }
+
+  # estimated mu
+  if(is.null(control$mu.hats)){
+    AW <- cbind(A, data.frame(W))
+    if(length(setdiff(Y, c(0,1))) == 0) {
+      family = 'binomial'
+    } else {
+      family = 'gaussian'
+    }
+    mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
+                           newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
+                           SL.library = control$mu.SL.library,
+                           family = family,
+                           obsWeights=rep(1,n),
+                           id=1:n)
+    control$mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
+  }
+
+  control$mu.hat <- A * control$mu.hats$mu1 + (1-A) * control$mu.hats$mu0
+
   # estimated tau
-  tau.hat <- mu1.hat - mu0.hat
-  Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
+  tau.hat <- control$mu.hats$mu1 - control$mu.hats$mu0
+  Z.hat <- (2*A - 1) / (A * control$pi.hat + (1-A) * (1-control$pi.hat))
 
   # estimated theta
   gamma.hat <- mean(tau.hat)
@@ -49,22 +71,24 @@ hteNullTest <- function(Y, A, W) {
     vec.leq <- function(x,y) prod(x <= y)
     return(mean(apply(W, 1, vec.leq, y = w)))
   }
-  u.vals <- sort(apply(W, 1, w.ecdf))
+  u.vals <- apply(W, 1, w.ecdf)
 
   # primitive function
   # n.new * 1 vector
-  Gamma.w.vals <- apply(w.vals, 1, function(w0) mean(prod(W <= w0) * tau.hat))
+  w.vals <- W
+  Gamma.w.vals <- apply(w.vals, 1, function(w0)
+    mean(apply(W, 1, function(x) prod(x <= w0))*tau.hat))
   Omega.w.vals <- Gamma.w.vals - gamma.hat * u.vals
 
   # nonparametric EIF
   # n * n.new matrix
   eif.Gamma <- apply(w.vals, 1, function(w0) {
-    (prod(W <= w0)) * (Z.hat * (Y - mu.hats) + tau.hat)
-    - Gamma.w.vals[which(w.vals == w0)]
+    (apply(W, 1, function(x) prod(x <= w0))) * (Z.hat * (Y - control$mu.hat) + tau.hat) -
+      Gamma.w.vals[which(as.logical(apply(W, 1, vec.eq, y = w0)))]
   })
   eif.Omega <- apply(w.vals, 1, function(w0) {
-    (as.numeric(rowSums(W <= w0) == d) - w.ecdf(w0)) * (Z.hat * (Y - mu.hats) + tau.hat - gamma.hat)
-    - Omega.w.vals[which(w.vals == w0)]
+    (apply(W, 1, function(x) prod(x <= w0)) - w.ecdf(w0)) * (Z.hat * (Y - control$mu.hat) + tau.hat - gamma.hat) -
+      Omega.w.vals[which(as.logical(apply(W, 1, vec.eq, y = w0)))]
   })
 
   # one-step estimators
