@@ -99,8 +99,8 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
 
   # testing procedure
   # test statistics
-  Gamma.stat <- n^1/2*max(abs(Gamma.os.est))
-  Omega.stat <- n^1/2*max(abs(Omega.os.est))
+  Gamma.stat <- n^(1/2)*max(abs(Gamma.os.est))
+  Omega.stat <- n^(1/2)*max(abs(Omega.os.est))
 
   # covariance matrices
   n.new <- dim(w.vals)[1]
