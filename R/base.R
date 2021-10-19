@@ -137,7 +137,8 @@ hte.measure.NullTest.control <- function(control){
   control.default = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
                          mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
                          conf.int = FALSE, conf.int.type = 'Wald',
-                         conf.level = 0.95, n.boot = 500)
+                         conf.level = 0.95, n.boot = 500,
+                         verbose = FALSE)
   control.names <- names(control)
   if(!is.null(control.names)) {
     for (name in control.names) {

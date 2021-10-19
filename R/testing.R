@@ -29,7 +29,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
     control$mu.hats = mu.hats
   }
 
-
+  if(control$verbose) cat("Estimating...\n")
   # estimated P(A = 1 | W = w)
   if(is.null(control$pi.hat)){
     prop.reg <- SuperLearner(Y=A, X = data.frame(W),
@@ -74,6 +74,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
   u.vals <- apply(W, 1, w.ecdf)
 
   # primitive function
+  if(control$verbose) cat("Computing Gamma and Omega...\n")
   # n.new * 1 vector
   w.vals <- W
   Gamma.w.vals <- apply(w.vals, 1, function(w0)
@@ -98,6 +99,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
   Omega.os.est <- colMeans(eif.Omega) + Omega.w.vals
 
   # testing procedure
+  if(control$verbose) cat("Computing statistics...\n")
   # test statistics
   Gamma.stat <- n^(1/2)*max(abs(Gamma.os.est))
   Omega.stat <- n^(1/2)*max(abs(Omega.os.est))
@@ -112,14 +114,23 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
   }))
 
   # quantiles
-  Gamma.epsilon <- rmvnorm(n=500, mean=rep(0, n.new), sigma = Gamma.cov.var)
-  Gamma.quantile <- quantile(apply(Gamma.epsilon, 1, function(x) {max(abs(x))}), 0.95)
+  Gamma.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Gamma.cov.var)
+  Gamma.epsilon.stats <- apply(Gamma.epsilon, 1, function(x) {max(abs(x))})
+  Gamma.pvalue <- mean(Gamma.epsilon.stats > Gamma.stat)
+  Gamma.quantile <- unname(quantile(Gamma.epsilon.stats, control$conf.level))
 
-  Omega.epsilon <- rmvnorm(n=500, mean=rep(0, n.new), sigma = Omega.cov.var)
-  Omega.quantile <- quantile(apply(Omega.epsilon, 1, function(x) {max(abs(x))}), 0.95)
+  Omega.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Omega.cov.var)
+  Omega.epsilon.stats <- apply(Omega.epsilon, 1, function(x) {max(abs(x))})
+  Omega.pvalue <- mean(Omega.epsilon.stats > Omega.stat)
+  Omega.quantile <- unname(quantile(Omega.epsilon.stats, control$conf.level))
 
-  res <- c(Gamma.stat, Omega.stat, Gamma.quantile, Omega.quantile)
+  ret <- data.frame(type = 'Gamma.stat', stat = Gamma.stat, pvalue = Gamma.pvalue,
+                    quantile = Gamma.quantile)
+  ret <- rbind(ret,
+               data.frame(type = 'Omega.stat', stat = Omega.stat, pvalue = Omega.pvalue,
+                          quantile = Omega.quantile))
 
-  res
+  ret
 
 }
+

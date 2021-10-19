@@ -71,3 +71,67 @@ ests.sim <-  function(n_range, j_range, control, null.sims=FALSE, out.glm=TRUE){
 
   return(ests)
 }
+
+
+testing.sim <-  function(n_range, j_range, control, null.sims=FALSE, out.glm=TRUE){
+  ret <- data.frame()
+  for (n in n_range){
+    for (j in j_range){
+      # if(j %% 100 == 0)
+      cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+
+      W <- matrix(runif(n*3, 0, 1), ncol=3)
+      A <- rbinom(n, size = 1, prob = pi0(W))
+      if(null.sims) {
+        Y <- rbinom(n, size = 1, prob = mu0.null(A, W))
+        psi0 <- mean((mu0.null(1,W) - mu0.null(0,W))^2)
+        theta0 <- var((mu0.null(1,W) - mu0.null(0,W)))
+      } else {
+        Y <- rbinom(n, size = 1, prob = mu0(A, W))
+        psi0 <- mean((mu0(1,W) - mu0(0,W))^2)
+        theta0 <- var((mu0(1,W) - mu0(0,W)))
+      }
+
+      if (length(ret)>0){
+        ret.tmp <- hteNullTest(Y, A, W, control = control, out.glm = out.glm)
+
+        ret.tmp$n <- rep(n, 2)
+        ret.tmp$j <- rep(j, 2)
+        ret.tmp$seed <- rep(seed, 2)
+
+        ret.tmp$psi0 <- rep(psi0, 2)
+        ret.tmp$theta0 <- rep(theta0, 2)
+
+        ret <- rbind(ret, ret.tmp)
+      }
+      else{
+        ret <- hteNullTest(Y, A, W, control = control, out.glm = out.glm)
+
+        ret$n <- rep(n, 2)
+        ret$j <- rep(j, 2)
+        ret$seed <- rep(seed, 2)
+
+        ret$psi0 <- rep(psi0, 2)
+        ret$theta0 <- rep(theta0, 2)
+      }
+    }
+  }
+
+  return(ret)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
