@@ -10,7 +10,7 @@ library(mvtnorm)
 #'
 #' @examples
 
-hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
+hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
   control <- hte.measure.NullTest.control(control)
   n = length(A)
 
@@ -106,21 +106,28 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
 
   # covariance matrices
   n.new <- dim(w.vals)[1]
-  Gamma.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
-    mean(eif.Gamma[,s] * eif.Gamma[,t])
-  }))
-  Omega.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
-    mean(eif.Omega[,s] * eif.Omega[,t])
-  }))
+  if (cov.var){
+    Gamma.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
+      mean(eif.Gamma[,s] * eif.Gamma[,t])
+    }))
+    Omega.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
+      mean(eif.Omega[,s] * eif.Omega[,t])
+    }))
 
-  # quantiles
-  Gamma.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Gamma.cov.var)
-  Gamma.epsilon.stats <- apply(Gamma.epsilon, 1, function(x) {max(abs(x))})
+    # quantiles
+    tm3 <- proc.time()
+    Gamma.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Gamma.cov.var)
+    Gamma.epsilon.stats <- apply(Gamma.epsilon, 1, function(x) {max(abs(x))})
+    Omega.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Omega.cov.var)
+    Omega.epsilon.stats <- apply(Omega.epsilon, 1, function(x) {max(abs(x))})
+  }else{
+    tm3 <- proc.time()
+    Gamma.epsilon.stats <- replicate(control$n.boot, max(abs(t(eif.Gamma)%*%rnorm(n.new, 0, 1)/sqrt(n))))
+    Omega.epsilon.stats <- replicate(control$n.boot, max(abs(t(eif.Omega)%*%rnorm(n.new, 0, 1)/sqrt(n))))
+  }
+
   Gamma.pvalue <- mean(Gamma.epsilon.stats > Gamma.stat)
   Gamma.quantile <- unname(quantile(Gamma.epsilon.stats, control$conf.level))
-
-  Omega.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Omega.cov.var)
-  Omega.epsilon.stats <- apply(Omega.epsilon, 1, function(x) {max(abs(x))})
   Omega.pvalue <- mean(Omega.epsilon.stats > Omega.stat)
   Omega.quantile <- unname(quantile(Omega.epsilon.stats, control$conf.level))
 
@@ -129,6 +136,14 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE) {
   ret <- rbind(ret,
                data.frame(type = 'Omega.stat', stat = Omega.stat, pvalue = Omega.pvalue,
                           quantile = Omega.quantile))
+  tm4 <- proc.time()
+
+  if (control$verbose){
+    cat("tm1-tm0 = ", tm1-tm0, "\n")
+    cat("tm2-tm1 = ", tm2-tm1, "\n")
+    cat("tm3-tm2 = ", tm3-tm2, "\n")
+    cat("tm4-tm3 = ", tm4-tm3, "\n")
+  }
 
   ret
 
