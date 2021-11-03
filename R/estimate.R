@@ -4,22 +4,25 @@
 #' @param A a binary treatment or exposure.
 #' @param W a vector of covariates observed prior to A.
 #' @param Y the observed outcome.
-#' @param control Optional list of control parameters. If \code{control=list()}, default.control.list will be used. See \code{hte.measure.NullTest.control} for details.
+#' @param control Optional list of control parameters. If \code{control=list()}, default control setting will be used.
+#' See \code{hte.measure.NullTest.control} for details.
 #'
-#' @return Returns a class of estimator and confidence interval.
+#' @return Returns a class of estimators and confidence intervals.
 #' @export
 #'
 #' @examples
-#' ret1 <- htem.estimator(A, W, Y, control = list()) # default control setting
-#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE)) # estimate with wald-type CI
-#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE, conf.int.type = 'boot')) # estimate with Bootstrap CI
+#' ret1 <- htem.estimator(A, W, Y, control = list()) # default control setting-point estimate with only hybrid outputs
+#' ret1 <- htem.estimator(A, W, Y, control = list(est.type = list('psi.est'='all', 'theta.est'='hybrid'))) # default control setting-point estimate with additional optional outputs
+#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE, conf.int.type = 'Wald')) # estimate with wald-type CI
+#' ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE, conf.int.type = 'boot', n.boot = 500)) # estimate with Bootstrap CI
 
 htem.estimator <- function(A, W, Y, control = list()){
 
+  # update control parameters
   control <- hte.measure.NullTest.control(control)
   n = length(A)
 
-  # estimated P(A = 1 | W = w)
+  # estimated propensity
   if(is.null(control$pi.hat)){
     prop.reg <- SuperLearner(Y=A, X = data.frame(W),
                               newX = data.frame(W),
@@ -30,7 +33,7 @@ htem.estimator <- function(A, W, Y, control = list()){
     control$pi.hat <- prop.reg$SL.predict
   }
 
-  # estimated mu
+  # estimated outcome regression
   if(is.null(control$mu.hats)){
     AW <- cbind(A, data.frame(W))
     if(length(setdiff(Y, c(0,1))) == 0) {
@@ -46,8 +49,8 @@ htem.estimator <- function(A, W, Y, control = list()){
                              id=1:n)
     control$mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
   }
-
   control$mu.hat <- A * control$mu.hats$mu1 + (1-A) * control$mu.hats$mu0
+
   # estimated tau
   tau.hat <- control$mu.hats$mu1 - control$mu.hats$mu0
   Z.hat <- (2*A - 1) / (A * control$pi.hat + (1-A) * (1-control$pi.hat))
@@ -61,7 +64,7 @@ htem.estimator <- function(A, W, Y, control = list()){
   # b) one-step
   psi.one.step.est <- mean(2 * tau.hat * (Y - control$mu.hat) * Z.hat + tau.hat^2)
 
-  # c) truncated
+  # c) hybrid
   psi.est <- ifelse(psi.one.step.est>0, psi.one.step.est, psi.plug.in)
 
   # 2. estimated theta
@@ -75,12 +78,37 @@ htem.estimator <- function(A, W, Y, control = list()){
   # b) one-step
   theta.one.step.est <- mean(2 * (tau.hat-gamma.hat) * (Y - control$mu.hat) * Z.hat + (tau.hat-gamma.hat)^2)
 
-  # c) truncated
+  # c) hybrid
   theta.est <- ifelse(theta.one.step.est>0, theta.one.step.est, theta.plug.in)
 
-  ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se)
-  ret <- rbind(ret,
-               data.frame(type = 'theta.est', est = theta.est, se = theta.se))
+  # estimator
+  est.type.names <- names(control$est.type)
+  psi.ret <- data.frame()
+  theta.ret <- data.frame()
+  optional.ret <- data.frame()
+
+  # psi estimator
+  if('psi.est' %in% est.type.names){
+    psi.ret <- data.frame(type = 'psi.est', est = psi.est, se = psi.se)
+    if (control$est.type[["psi.est"]] == 'all'){
+      optional.ret <- rbind(optional.ret,
+                   data.frame(type = 'psi.plug.in.est', est = psi.plug.in, se = psi.se))
+      optional.ret <- rbind(optional.ret,
+                   data.frame(type = 'psi.one.step.est', est = psi.one.step.est, se = psi.se))
+    }
+  }
+
+  # theta estimator
+  if('theta.est' %in% est.type.names){
+    theta.ret <- data.frame(type = 'theta.est', est = theta.est, se = theta.se)
+    if (control$est.type[["theta.est"]] == 'all'){
+      optional.ret <- rbind(optional.ret,
+                    data.frame(type = 'theta.plug.in.est', est = theta.plug.in, se = theta.se))
+      optional.ret <- rbind(optional.ret,
+                         data.frame(type = 'theta.one.step.est', est = theta.one.step.est, se = theta.se))
+    }
+  }
+  ret <- rbind(psi.ret, theta.ret)
 
   # confidence interval
   if(control$conf.int){
@@ -99,12 +127,18 @@ htem.estimator <- function(A, W, Y, control = list()){
                              control = list(pi.hat = boot.pi.hat,
                                             mu.hats = boot.mu.hats,
                                             conf.int = FALSE))
-        boot.ret$est
+        boot.ret$ret$est
       })
       boot.ci <- apply(boot.ests, 1, quantile, c((1-control$conf.level)/2, 1-(1-control$conf.level)/2))
       ret$ll = c(boot.ci[,1][[1]], boot.ci[,2][[1]])
       ret$ul = c(boot.ci[,1][[2]], boot.ci[,2][[2]])
     }
   }
-  return(ret)
+
+  if (length(optional.ret)>0){
+    est.ret = list(ret=ret, optional.ret=optional.ret)
+  }else{
+    est.ret = list(ret=ret)
+  }
+  return(est.ret)
 }

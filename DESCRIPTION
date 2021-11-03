@@ -9,7 +9,10 @@ Description: More about what it does (maybe more than one line)
 Depends: 
   ggplot2,
   plyr,
-  SuperLearner
+  SuperLearner,
+  mvtnorm,
+  dplyr,
+  gam
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true

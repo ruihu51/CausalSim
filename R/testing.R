@@ -10,7 +10,9 @@ library(mvtnorm)
 #'
 #' @examples
 
-hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
+hteNullTest <- function(Y, A, W, control = list(), out.glm=FALSE, cov.var=FALSE) {
+
+  # update control parameters
   control <- hte.measure.NullTest.control(control)
   n = length(A)
 
@@ -30,7 +32,8 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
   }
 
   if(control$verbose) cat("Estimating...\n")
-  # estimated P(A = 1 | W = w)
+  tm0 <- proc.time()
+  # estimated propensity
   if(is.null(control$pi.hat)){
     prop.reg <- SuperLearner(Y=A, X = data.frame(W),
                              newX = data.frame(W),
@@ -41,7 +44,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
     control$pi.hat <- prop.reg$SL.predict
   }
 
-  # estimated mu
+  # estimated outcome regression
   if(is.null(control$mu.hats)){
     AW <- cbind(A, data.frame(W))
     if(length(setdiff(Y, c(0,1))) == 0) {
@@ -72,9 +75,9 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
     return(mean(apply(W, 1, vec.leq, y = w)))
   }
   u.vals <- apply(W, 1, w.ecdf)
-
   # primitive function
   if(control$verbose) cat("Computing Gamma and Omega...\n")
+  tm1 <- proc.time()
   # n.new * 1 vector
   w.vals <- W
   Gamma.w.vals <- apply(w.vals, 1, function(w0)
@@ -100,6 +103,7 @@ hteNullTest <- function(Y, A, W, control = list(), out.glm=TRUE, cov.var=TRUE) {
 
   # testing procedure
   if(control$verbose) cat("Computing statistics...\n")
+  tm2 <- proc.time()
   # test statistics
   Gamma.stat <- n^(1/2)*max(abs(Gamma.os.est))
   Omega.stat <- n^(1/2)*max(abs(Omega.os.est))
