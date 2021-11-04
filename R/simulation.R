@@ -7,20 +7,20 @@ library(SuperLearner)
 #' Function to generate simulated data
 #'
 #' @return named list containing observed data and the global measures of treatment effect heterogeneity
-generate.data <- function(n){
-  pi0 <- function(w) expit(sqrt(abs(w[,1])) + w[,3])
-  mu0.null <- function(a, w) expit(3 * w[,1] + w[,2] + w[,1])
-
-  W <- matrix(runif(n*3, 0, 1), ncol=3)
-  A <- rbinom(n, size = 1, prob = pi0(W))
-  Y <- rbinom(n, size = 1, prob = mu0.null(A, W))
-
-  psi0 <- mean((mu0.null(1,W) - mu0.null(0,W))^2)
-  theta0 <- var((mu0.null(1,W) - mu0.null(0,W)))
-
-  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
-  return(simulated.data)
-}
+# generate.data <- function(n){
+#   pi0 <- function(w) expit(sqrt(abs(w[,1])) + w[,3])
+#   mu0.null <- function(a, w) expit(3 * w[,1] + w[,2] + w[,1])
+#
+#   W <- matrix(runif(n*3, 0, 1), ncol=3)
+#   A <- rbinom(n, size = 1, prob = pi0(W))
+#   Y <- rbinom(n, size = 1, prob = mu0.null(A, W))
+#
+#   psi0 <- mean((mu0.null(1,W) - mu0.null(0,W))^2)
+#   theta0 <- var((mu0.null(1,W) - mu0.null(0,W)))
+#
+#   simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+#   return(simulated.data)
+# }
 
 #' Simulation for treatment effect heterogeneity estimators.
 #'
@@ -39,8 +39,8 @@ generate.data <- function(n){
 ests.sim <-  function(n_range, j_range, control, out.glm=TRUE){
   ests <- ldply(n_range, function(n) {
     ldply(j_range, function(j) {
-      print(j)
-      # if(j %% 100 == 0) cat(n, j, '\n')
+      # print(j)
+      if(j %% 100 == 0) cat(n, j, '\n')
       seed <- sample(1e3:1e8, 1)
       set.seed(seed)
 
