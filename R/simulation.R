@@ -36,7 +36,7 @@ library(SuperLearner)
 #' @examples
 #' ests.sim.1 <- ests.sim(200*c(1:10), 1:500, control = list(conf.int = TRUE), null.sims=FALSE, out.glm=TRUE)
 #' ests.sim.2 <- ests.sim(200*c(1:10), 1:500, control = list(conf.int = TRUE, conf.int.type = 'boot'), null.sims=FALSE, out.glm=TRUE)
-ests.sim <-  function(n_range, j_range, control, out.glm=TRUE){
+ests.sim <-  function(n_range, j_range, control, generate_func, out.glm=TRUE){
   ests <- ldply(n_range, function(n) {
     ldply(j_range, function(j) {
       # print(j)
@@ -45,7 +45,7 @@ ests.sim <-  function(n_range, j_range, control, out.glm=TRUE){
       set.seed(seed)
 
       # generate simulated data
-      simulated.data <- do.call(generate.data, list(n=n))
+      simulated.data <- do.call(generate_func, list(n=n))
       Y <- simulated.data$Y
       A <- simulated.data$A
       W <- simulated.data$W
@@ -87,7 +87,7 @@ ests.sim <-  function(n_range, j_range, control, out.glm=TRUE){
   return(ests)
 }
 
-testing.sim <-  function(n_range, j_range, control, out.glm=FALSE){
+testing.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
   ret <- data.frame()
   for (n in n_range){
     for (j in j_range){
@@ -97,7 +97,7 @@ testing.sim <-  function(n_range, j_range, control, out.glm=FALSE){
       set.seed(seed)
 
       # generate simulated data
-      simulated.data <- do.call(generate.data, list(n=n))
+      simulated.data <- do.call(generate_func, list(n=n))
       Y <- simulated.data$Y
       A <- simulated.data$A
       W <- simulated.data$W
