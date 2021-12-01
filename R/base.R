@@ -33,7 +33,13 @@ label.result <- function(ret, n, j, seed){
   return(ret)
 }
 
-
+# Function to create repeatable seed
+create.seed.dict <- function(x){
+  x %>%
+    subset(type %in% "Gamma.stat") %>%
+    select(c("n", "j", "seed")) %>%
+    rename(sample_n=n, j=j, seed=seed)
+}
 
 # useful functions
 f <- function(x) log(exp(x) - 1)
