@@ -123,7 +123,7 @@ htem.estimator <- function(A, W, Y, control = list()){
 
         boot.pi.hat <- control$pi.hat[boot.inds]
         boot.mu.hats <- control$mu.hats[boot.inds,]
-        boot.ret <- htem.estimator(A[boot.inds], W[boot.inds], Y[boot.inds],
+        boot.ret <- htem.estimator(A[boot.inds], W[boot.inds,], Y[boot.inds],
                              control = list(pi.hat = boot.pi.hat,
                                             mu.hats = boot.mu.hats,
                                             conf.int = FALSE))
