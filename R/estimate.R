@@ -31,6 +31,9 @@ htem.estimator <- function(A, W, Y, control = list()){
                               obsWeights=rep(1,n),
                               id=1:n)
     control$pi.hat <- prop.reg$SL.predict
+    if ((min(control$pi.hat)<=0) | (max(control$pi.hat)>=1)) {
+      stop("pi.hat <= 0 or pi.hat >= 1")
+    }
   }
 
   # estimated outcome regression
